@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ChatCode - Codec Knowledge Graph Visualization" />
+    <meta name="theme-color" content="#0d1117" />
+    <title>ChatCode - Knowledge Graph</title>
+    <style>
+      /* Critical pre-render styles to prevent FOUC */
+      body {
+        margin: 0;
+        background: #0d1117;
+        color: #c9d1d9;
+        overflow: hidden;
+        height: 100vh;
+      }
+      #root { height: 100vh; }
+      .preload-msg {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+        color: #6e7681;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="preload-msg">Loading ChatCode...</div>
+    </div>
+    <noscript>
+      <div style="padding:40px;text-align:center;color:#c9d1d9;font-family:sans-serif;">
+        <h2>ChatCode requires JavaScript</h2>
+        <p>Please enable JavaScript to view the knowledge graph visualization.</p>
+      </div>
+    </noscript>
+
+    <!-- SVG definitions shared across the app (graph legend icons, markers) -->
+    <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+      <defs>
+        <!-- Arrow marker for graph edges -->
+        <marker id="graph-arrow" viewBox="0 0 10 10" refX="8" refY="5"
+                markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#484f58" />
+        </marker>
+        <!-- Node type symbols for legend -->
+        <symbol id="icon-file" viewBox="0 0 16 16">
+          <circle cx="8" cy="8" r="6" fill="#58a6ff" stroke="#388bfd" stroke-width="1"/>
+        </symbol>
+        <symbol id="icon-concept" viewBox="0 0 16 16">
+          <polygon points="8,1.5 14,5 14,11 8,14.5 2,11 2,5" fill="#d2a8ff" stroke="#bc8cff" stroke-width="1"/>
+        </symbol>
+        <symbol id="icon-task" viewBox="0 0 16 16">
+          <rect x="3" y="3" width="10" height="10" rx="2" fill="#3fb950" stroke="#2ea043" stroke-width="1"/>
+        </symbol>
+      </defs>
+    </svg>
+
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

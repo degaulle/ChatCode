@@ -1,0 +1,11 @@
+node_modules/
+.env
+dist/
+projects/*.json
+/tmp/
+*.log
+.DS_Store
+workspace/
+.claude/
+hello_world.py
+knowledge_graph.json
