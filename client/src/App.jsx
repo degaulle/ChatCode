@@ -7,8 +7,10 @@ import KnowledgeGraph from './components/KnowledgeGraph.jsx';
 import GraphControls from './components/GraphControls.jsx';
 import ProjectPanel from './components/ProjectPanel.jsx';
 import ClaudeOutputPanel from './components/ClaudeOutputPanel.jsx';
+import AdminView from './components/AdminView.jsx';
 
 export default function App() {
+  const [view, setView] = useState('main'); // 'main' or 'admin'
   const [fullTranscript, setFullTranscript] = useState('');
   const [features, setFeatures] = useState([]);
   const [todos, setTodos] = useState([]);
@@ -57,8 +59,13 @@ export default function App() {
         if (msg.fullTranscript) setFullTranscript(msg.fullTranscript);
         if (msg.extraction) {
           setFeatures(msg.extraction.features || []);
-          setTodos(msg.extraction.todos || []);
+          if (!msg.queue || msg.queue.length === 0) {
+            setTodos(msg.extraction.todos || []);
+          }
           setExtractionSummary(msg.extraction.summary || '');
+        }
+        if (msg.queue && msg.queue.length > 0) {
+          setTodos(msg.queue);
         }
         if (msg.graph) setGraph(msg.graph);
         break;
@@ -84,6 +91,11 @@ export default function App() {
     setTodos((prev) => prev.map((t) => t.id === id ? { ...t, text } : t));
   }, []);
 
+  // Show admin view if selected
+  if (view === 'admin') {
+    return <AdminView onBack={() => setView('main')} />;
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -103,6 +115,26 @@ export default function App() {
           setFeatures={setFeatures}
           setTodos={setTodos}
         />
+        <button
+          className="btn admin-btn"
+          onClick={() => setView('admin')}
+        >
+          Agent Admin
+        </button>
+        <button
+          className="btn preview-btn"
+          onClick={async () => {
+            try {
+              const res = await fetch('http://localhost:3001/api/preview', { method: 'POST' });
+              const data = await res.json();
+              if (data.url) window.open(data.url, '_blank');
+            } catch (err) {
+              console.error('Preview failed:', err);
+            }
+          }}
+        >
+          Show Build Result
+        </button>
       </header>
 
       <div className="app-body">

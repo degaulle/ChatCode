@@ -76,6 +76,12 @@ export class GraphManager {
     writeFileSync(this.graphPath, JSON.stringify(empty, null, 2));
   }
 
+  // Load a saved graph (for project restore) and write to disk
+  loadGraph(graph) {
+    this._lastGraph = graph;
+    writeFileSync(this.graphPath, JSON.stringify(graph, null, 2));
+  }
+
   onUpdate(callback) {
     this._callback = callback;
   }

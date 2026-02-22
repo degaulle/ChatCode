@@ -28,7 +28,14 @@ export default function ProjectPanel({
         if (msg.graph) setGraph(msg.graph);
         if (msg.extraction) {
           setFeatures(msg.extraction.features || []);
-          setTodos(msg.extraction.todos || []);
+          // Only use extraction todos if no saved queue
+          if (!msg.queue || msg.queue.length === 0) {
+            setTodos(msg.extraction.todos || []);
+          }
+        }
+        // Restore saved queue (remaining todos) if present
+        if (msg.queue && msg.queue.length > 0) {
+          setTodos(msg.queue);
         }
         setProjectName(msg.name || 'my-project');
       }
@@ -45,6 +52,7 @@ export default function ProjectPanel({
       type: 'save_project',
       name: projectName.trim(),
       graph,
+      queue: todos,
     });
   };
 

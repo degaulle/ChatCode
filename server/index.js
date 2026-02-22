@@ -16,6 +16,7 @@ import { ProjectManager } from './services/projectManager.js';
 import { v4 as uuidv4 } from 'uuid';
 import { mkdirSync } from 'fs';
 import mammoth from 'mammoth';
+import { spawn } from 'child_process';
 
 const PORT = process.env.PORT || 3001;
 // Claude Code works in a separate workspace directory, not the ChatCode source
@@ -37,6 +38,10 @@ const projectManager = new ProjectManager();
 
 // Per-client state
 const clientState = new Map();
+
+// Preview server state
+let previewProcess = null;
+const PREVIEW_PORT = 8080;
 
 // Broadcast to all connected clients
 function broadcast(data) {
@@ -271,11 +276,13 @@ wss.on('connection', (ws) => {
 
       case 'save_project': {
         try {
+          // Use server-side graph as source of truth (most up-to-date)
+          const serverGraph = graphManager.getGraphSync();
           const projectData = {
             name: msg.name,
             fullTranscript: state.fullTranscript,
             extraction: state.lastExtraction,
-            graph: msg.graph || { nodes: [], edges: [] },
+            graph: serverGraph || msg.graph || { nodes: [], edges: [] },
             queue: msg.queue || [],
           };
           await projectManager.saveProject(msg.name, projectData);
@@ -292,6 +299,10 @@ wss.on('connection', (ws) => {
           // Restore state
           if (project.fullTranscript) state.fullTranscript = project.fullTranscript;
           if (project.extraction) state.lastExtraction = project.extraction;
+          // Restore graph into graphManager so new nodes append to it
+          if (project.graph) {
+            graphManager.loadGraph(project.graph);
+          }
           ws.send(JSON.stringify({ type: 'project_loaded', ...project }));
         } catch (err) {
           ws.send(JSON.stringify({ type: 'error', message: 'Load failed: ' + err.message }));
@@ -318,6 +329,7 @@ wss.on('connection', (ws) => {
         }
         break;
       }
+
     }
   });
 
@@ -349,9 +361,88 @@ app.delete('/api/projects/:name', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Agent profiles endpoint
+app.get('/api/agents', async (req, res) => {
+  try {
+    const { readFile } = await import('fs/promises');
+    const agentProfilesPath = join(PROJECT_DIR, 'agent_profiles.json');
+    const data = await readFile(agentProfilesPath, 'utf-8');
+    const profiles = JSON.parse(data);
+    res.json(profiles);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Preview server endpoint
+app.post('/api/preview', async (req, res) => {
+  try {
+    const { readdirSync, statSync } = await import('fs');
+
+    // Find the HTML entry point
+    function findEntryHtml(dir) {
+      // Check common build output dirs first
+      for (const sub of ['dist', 'build', 'public', 'out']) {
+        try {
+          const subIndex = join(dir, sub, 'index.html');
+          statSync(subIndex);
+          return sub + '/index.html';
+        } catch {}
+      }
+      // Check root index.html
+      try { statSync(join(dir, 'index.html')); return 'index.html'; } catch {}
+      // Find any .html file in root
+      try {
+        const files = readdirSync(dir);
+        const html = files.find((f) => f.endsWith('.html'));
+        if (html) return html;
+      } catch {}
+      return null;
+    }
+
+    const entry = findEntryHtml(PROJECT_DIR);
+    if (!entry) {
+      res.status(404).json({ error: 'No HTML file found in workspace' });
+      return;
+    }
+
+    // Kill our tracked process if any
+    if (previewProcess) {
+      previewProcess.kill();
+      previewProcess = null;
+    }
+    // Also kill any stale process on the port (e.g. from a previous server session)
+    try {
+      const { execSync } = await import('child_process');
+      execSync(`lsof -ti :${PREVIEW_PORT} | xargs kill -9 2>/dev/null`, { stdio: 'ignore' });
+      await new Promise((r) => setTimeout(r, 300));
+    } catch {}
+
+    previewProcess = spawn('python3', ['-m', 'http.server', String(PREVIEW_PORT)], {
+      cwd: PROJECT_DIR,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    previewProcess.on('error', (err) => {
+      console.error('Preview server error:', err);
+      previewProcess = null;
+    });
+    previewProcess.on('close', () => {
+      previewProcess = null;
+    });
+    // Wait for the server to bind the port
+    await new Promise((r) => setTimeout(r, 600));
+    const url = `http://localhost:${PREVIEW_PORT}/${entry}`;
+    console.log(`Preview server started at ${url}`);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down...');
+  if (previewProcess) previewProcess.kill();
   await claude.destroy();
   graphManager.stop();
   server.close();
